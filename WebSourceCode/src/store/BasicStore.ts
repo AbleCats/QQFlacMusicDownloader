@@ -1,3 +1,4 @@
+import { MediaQuery } from './../utils/type/BasicType';
 /*
  * # Copyright (c) 2023. 秋城落叶, Inc. All Rights Reserved
  * # @作者         : 秋城落叶(QiuChenly)
@@ -40,9 +41,14 @@ export const BasicStore = defineStore("basicStore", {
         concurrency: {
           num: 16,
           downloadFolder: "",
+          saveLyric: false,
         },
         platform: "qq",
       },
+      MusicMetaPrepare: [{
+        platform: 'mg',
+        metas: [] as MediaQuery[]
+      }],
       netease: {
         isLogin: false,
         token: "",
@@ -53,7 +59,7 @@ export const BasicStore = defineStore("basicStore", {
   },
   getters: {},
   actions: {
-    initEnv() {},
+    initEnv() { },
   },
   persist: true,
 });

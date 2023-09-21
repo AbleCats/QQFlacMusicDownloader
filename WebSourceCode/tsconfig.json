@@ -17,7 +17,8 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "unplugin-icons/types/vue"
+      "unplugin-icons/types/vue",
+      "node"
     ],
     "paths": {
       "@/*": [
@@ -32,6 +33,9 @@
     "src/**/*.vue",
     "unplugin-icons/types/vue",
     "pinia-plugin-persist-uni"
+  ],
+  "exclude": [
+    "src/Netease/**/*.ts",
   ],
   "references": [
     {

@@ -25,8 +25,8 @@ const userStore = () => {
 };
 
 const config = {
-  baseURL: "",
-  // baseURL: "http://localhost:8899", // 本地测试时使用
+  baseURL: process.env.NODE_ENV === 'production' ? "" : "http://127.0.0.1:8899",
+  // baseURL: "", // 本地测试时使用
   timeout: 15000,
   headers: {
     "Content-Type": "multipart/form-data;application/json;charset=UTF-8;",
@@ -99,9 +99,19 @@ export const Api = {
       code: Number;
     }>("/status");
   },
-  async searchMusic(key: string, page: number, type = "qq", size = 30) {
-    let url = "/" + type + "/search/" + key + "/" + page + "/" + size;
+  async searchMusic(key: string, page: number, type = "qq", size = 30, extra = '') {
+    let url = "/" + type + "/search/" + key + "/" + page + "/" + size + extra;
     return this.get<SearchMusicResult>(url);
+  },
+  /**
+   * 获取酷我搜索token
+   * @returns 
+   */
+  async getKWToken() {
+    return this.get<{
+      code: number,
+      token: string
+    }>("/kw/search/getToken")
   },
   async searchMusicForMyFreeMp3(
     type = "myfreemp3",
@@ -112,12 +122,12 @@ export const Api = {
       type: string;
       v: string;
     } = {
-      page: 1,
-      text: "",
-      token: "",
-      type: "YQM",
-      v: "beta",
-    }
+        page: 1,
+        text: "",
+        token: "",
+        type: "YQM",
+        v: "beta",
+      }
   ) {
     let url = "/" + type + "/search";
     return this.post<SearchMusicResult>(url, data);
@@ -130,11 +140,11 @@ export const Api = {
       config: config,
     });
   },
-  setBaseConfig(param: { folder: string; num: number }) {
+  setBaseConfig(param: { folder: string; num: number; lyric: boolean }) {
     return this.post("/config", param);
   },
   getBaseConfig() {
-    return this.get<{ folder: string; num: number }>("/getConfig");
+    return this.get<{ folder: string; num: number; lyric: boolean }>("/getConfig");
   },
   getNeteaseQRCode() {
     return this.get<{
@@ -174,4 +184,8 @@ export const Api = {
   esLogout() {
     return Api.get("/es/esLogout");
   },
+  // 本地文件管理接口
+  getLocalFiles() {
+    return Api.get<any>("/files/getAllFileList")
+  }
 };

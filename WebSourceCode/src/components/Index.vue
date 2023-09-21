@@ -10,7 +10,9 @@
 <template>
   <div class="content">
     <div class="left-banner">
-      <div class="title">QQ音乐无损音源下载工具</div>
+      <div class="title">
+        <div>曲库流浪计划</div>
+      </div>
       <div class="functions">
         <div class="home-page" @click="router.push('/home')">
           <i-system-uicons-sun />
@@ -30,7 +32,7 @@
         </div>
         <div class="home-page" @click="router.push('/download')">
           <i-carbon-download />
-          <span>下载列表</span>
+          <span>下载管理</span>
         </div>
       </div>
     </div>
@@ -60,11 +62,36 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
+@media screen and (max-width: 550px) {
+  .left-banner {
+    box-sizing: border-box;
+    box-shadow: none !important;
+    border: solid 1px var(--qiuchen-text);
+
+    width: auto !important;
+    min-width: auto !important;
+    min-height: auto !important;
+
+    .title {
+      display: none !important;
+    }
+  }
+
+  .functions {
+
+    & div {
+      box-shadow: none !important;
+      border: solid 1px var(--qiuchen-text);
+      padding: 10px !important;
+    }
+
+
+    span {
+      display: none;
+    }
+  }
 }
+
 
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
@@ -79,8 +106,6 @@ onMounted(() => {
   height: 100%;
   display: flex;
 
-  min-width: 800px;
-  min-height: 600px;
   overflow: auto;
 
   .left-banner {
@@ -93,12 +118,17 @@ onMounted(() => {
     z-index: 1;
 
     .title {
-      height: 65px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      padding: 10px;
+      font-size: 20px;
       // background-color: darkorange;
       box-shadow: 0 0 10px var(--qiuchen-text);
+
+
+
     }
 
     .functions {

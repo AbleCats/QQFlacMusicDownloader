@@ -2,8 +2,8 @@
 #  @作者         : 秋城落叶(QiuChenly)
 #  @邮件         : qiuchenly@outlook.com
 #  @文件         : 项目 [qqmusic] - QQMusic.py
-#  @修改时间    : 2023-03-14 03:40:11
-#  @上次修改    : 2023/3/14 下午3:40
+#  @修改时间    : 2023-07-30 09:53:12
+#  @上次修改    : 2023/7/30 下午9:53
 
 import json
 import uuid
@@ -12,6 +12,7 @@ from flaskSystem.src.Api.BaseApi import BaseApi
 from flaskSystem.src.Common import EncryptTools, Http
 from flaskSystem.src.Types.Types import Songs
 from flask import current_app
+import base64
 
 
 class QQMusicApi(BaseApi):
@@ -27,6 +28,7 @@ class QQMusicApi(BaseApi):
 
     def getHead(self):
         return {
+            "authority": "u6.y.qq.com",
             "User-Agent": "QQ音乐/73222 CFNetwork/1406.0.2 Darwin/22.4.0".encode("utf-8"),
             "Accept": "*/*",
             "Accept-Language": "zh-CN,zh-Hans;q=0.9",
@@ -138,9 +140,19 @@ class QQMusicApi(BaseApi):
                 "tmeLoginType": "2",
             },
         }
-        d = self.getQQServersCallback(url, 1, payload)
-        d = d.json()
+        res = self.getQQServersCallback(url, 1, payload)
+        d = res.json()
         d = d["music.musichallSong.PlayLyricInfo.GetPlayLyricInfo"]["data"]
+        if d['lyric'] != '':
+            # "retcode": 0,
+            # "code": 0,
+            # "subcode": 0,
+            # {'retcode': -1901, 'code': -1901, 'subcode': -1901}
+            # 外语歌曲有翻译 但是👴不需要！
+            lyric = base64.b64decode(d['lyric'])
+            d = lyric.decode('utf-8')
+        else:
+            d = ''
         return d
 
     def getQQMusicMediaLyric(self, mid: str) -> dict:
@@ -324,10 +336,86 @@ class QQMusicApi(BaseApi):
         """
         return EncryptTools.testGetLink(mid, quality=sourceType)
 
+    def getQQMusicSearchV2(self, key: str = "", page: int = 1, size: int = 30):
+        json_ = self.getQQSearchData(key, page, size)
+        # 开始解析QQ音乐的搜索结果
+        res = json_["data"]
+        lst = res["body"]["song"]["list"]
+        meta = res["meta"]
+
+        # 数据清洗,去掉搜索结果中多余的数据
+        list_clear = []
+        for i in lst:
+            list_clear.append(
+                {
+                    "album": i["album"],
+                    "docid": i["docid"],
+                    "id": i["id"],
+                    "mid": i["mid"],
+                    "name": i["title"],
+                    "singer": i["singer"],
+                    "time_public": i["time_public"],
+                    "title": i["title"],
+                    "file": i["file"],
+                }
+            )
+
+        # rebuild json
+        # list_clear: 搜索出来的歌曲列表
+        # {
+        #   size 搜索结果总数
+        #   next 下一搜索页码 -1表示搜索结果已经到底
+        #   cur  当前搜索结果页码
+        # }
+        return {
+            "data": list_clear,
+            "page": {
+                "size": meta["sum"],
+                "next": meta["nextpage"],
+                "cur": meta["curpage"],
+                "searchKey": key,
+            },
+        }
+
+    def getQQSearchData(self, key, page, size):
+        url = "https://u.y.qq.com/cgi-bin/musicu.fcg"
+
+        payload = {"music.search.SearchCgiService.DoSearchForQQMusicDesktop": {
+            "method": "DoSearchForQQMusicDesktop",
+            "module": "music.search.SearchCgiService",
+            "param": {
+                "search_type": 0,
+                "query": key,
+                "page_num": page,
+                "num_per_page": size
+            }
+        }}
+        headers = {
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "referer": "https://i.y.qq.com",
+            "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1",
+            "content-type": "application/json",
+            "accept": "application/json",
+            "Host": "u.y.qq.com",
+            "Connection": "Keep-Alive"
+        }
+
+        res = self.QQHttpServer.getHttp2Json(
+            url,
+            1,
+            payload,
+            headers,
+        )
+        # print(res.text)
+        json_ = res.json()
+        return json_["music.search.SearchCgiService.DoSearchForQQMusicDesktop"]
+
     def getQQMusicSearch(
-        self, key: str = "", page: int = 1, size: int = 30
-    ) -> tuple[(dict, dict)]:
-        """搜索音乐
+            self, key: str = "", page: int = 1, size: int = 30
+    ) -> dict:
+        """
+        搜索音乐
+        此接口已废弃。请参考@getQQMusicSearchV2
 
         参数:
             key (str): 搜索关键词. 默认是 "".
@@ -336,6 +424,9 @@ class QQMusicApi(BaseApi):
         返回值:
             dict: 返回搜索列表
         """
+
+        return self.getQQMusicSearchV2(key, page, size)
+
         # base url
         url = "https://u.y.qq.com/cgi-bin/musicu.fcg"
         # url = "https://u.y.qq.com/cgi-bin/musics.fcg" # 需要加密 懒得动了
@@ -558,6 +649,7 @@ class QQMusicApi(BaseApi):
                     "title": flacName,
                     "singer": f"{singer}",
                     "album": albumName,
+                    "albumMid": i["album"]["mid"],
                     "time_publish": time_publish,
                     "readableText": f'{time_publish} {singer} - {i["title"]} | {qStr}',
                 }
@@ -657,7 +749,7 @@ class QQMusicApi(BaseApi):
             "req_1": {
                 "module": "musicToplist.ToplistInfoServer",
                 "method": "GetDetail",
-                "param": {"topid": int(_id), "offset": 0, "num": 100}, #, "period": "2023-07-01"},
+                "param": {"topid": int(_id), "offset": 0, "num": 100},  # , "period": "2023-07-01"},
             },
         }
 
@@ -697,7 +789,42 @@ class QQMusicApi(BaseApi):
             "page": {"size": len(list_clear), "next": "1", "cur": "1", "searchKey": ""},
         }
 
-    def getSingleMusicInfo(self, _id: str):
+    def getAlbumInfomation(self, albumMid="002eFUFm2XYZ7z", albumID=0):
+        url = "https://u.y.qq.com/cgi-bin/musicu.fcg"
+
+        payload = {
+            "comm": {
+                "cv": 4747474,
+                "ct": 24,
+                "format": "json",
+                "inCharset": "utf-8",
+                "outCharset": "utf-8",
+                "notice": 0,
+                "platform": "yqq.json"
+            },
+            "AlbumInfoServer": {
+                "module": "music.musichallAlbum.AlbumInfoServer",
+                "method": "GetAlbumDetail",
+                "param": {
+                    "albumMid": albumMid,
+                    "albumID": albumID
+                }
+            }
+        }
+        headers = {
+            "authority": "u.y.qq.com",
+            "accept": "application/json",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "content-type": "application/json",
+            "origin": "https://y.qq.com",
+            "referer": "https://y.qq.com/",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.183"
+        }
+        r = self.getQQServersCallback(url, 1, payload)
+        r = r.json()
+        return r
+
+    def getSingleMusicInfoAll(self, _id: str, albumMid=''):
         """
         获取单曲歌曲信息
 
@@ -708,7 +835,6 @@ class QQMusicApi(BaseApi):
         返回:
 
         """
-        u = "https://u.y.qq.com/cgi-bin/musicu.fcg"
 
         # 这里有两种格式 一种是纯数字 一种是mid 所以判断是否可被int即可
 
@@ -719,28 +845,91 @@ class QQMusicApi(BaseApi):
             sid = 0
             mid = _id
 
-        d = {
-            "get_song_detail": {
-                "module": "music.pf_song_detail_svr",
-                "method": "get_song_detail",
-                "param": {"song_id": sid, "song_mid": mid, "song_type": 0},
-            },
-            "comm": {
-                "g_tk": 0,
-                "uin": "",
-                "format": "json",
-                "ct": 6,
-                "cv": 80600,
-                "platform": "wk_v17",
-                "uid": "",
-                "guid": self.getUUID(),
-            },
-        }
-
-        r = self.getQQServersCallback(u, 1, d)
+        # 切换接口
+        useV2 = False
+        if useV2:
+            url = "https://u6.y.qq.com/cgi-bin/musicu.fcg"
+            payload = {
+                "comm": {
+                    "format": "json",
+                    "inCharset": "utf-8",
+                    "outCharset": "utf-8",
+                    "notice": 0,
+                    "platform": "h5",
+                    "needNewCode": 1
+                },
+                "get_song_detail": {
+                    "module": "music.pf_song_detail_svr",
+                    "method": "get_song_detail",
+                    "param": {
+                        "song_id": sid, "song_mid": mid, "song_type": 0
+                    }
+                },
+                "AlbumInfoServer": {
+                    "module": "music.musichallAlbum.AlbumInfoServer",
+                    "method": "GetAlbumDetail",
+                    "param": {
+                        "albumMid": albumMid,
+                        "albumID": 0
+                    }
+                }
+            }
+            headers = {
+                "authority": "u6.y.qq.com",
+                "accept": "application/json",
+                "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+                "content-type": "application/json",
+                "origin": "https://i.y.qq.com",
+                "referer": "https://i.y.qq.com/",
+                "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1 Edg/115.0.0.0"
+            }
+            r = self.QQHttpServer.getHttp2Json(url, 1, payload, headers)
+        else:
+            u = "https://u.y.qq.com/cgi-bin/musicu.fcg"
+            d = {
+                "comm": {
+                    "g_tk": 0,
+                    "uin": "",
+                    "format": "json",
+                    "ct": 6,
+                    "cv": 80600,
+                    "platform": "h5",
+                    "uid": "",
+                    "guid": self.getUUID(),
+                },
+                "get_song_detail": {
+                    "module": "music.pf_song_detail_svr",
+                    "method": "get_song_detail",
+                    "param": {
+                        "song_id": sid, "song_mid": mid, "song_type": 0
+                    },
+                },
+                "AlbumInfoServer": {
+                    "module": "music.musichallAlbum.AlbumInfoServer",
+                    "method": "GetAlbumDetail",
+                    "param": {
+                        "albumMid": albumMid,
+                        "albumID": 0
+                    }
+                }
+            }
+            r = self.getQQServersCallback(u, 1, d)
         r = r.json()
+        get_song_detail = r
+        return get_song_detail
+
+    def getSingleMusicInfo(self, _id: str):
+        """
+        获取单曲音乐详细信息
+
+        Args:
+            _id (str): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        get_song_detail = self.getSingleMusicInfoAll(_id, '')["get_song_detail"]
         # print(r)
-        get_song_detail = r["get_song_detail"]
         if get_song_detail["code"] == 0:
             i = get_song_detail["data"]["track_info"]
             lst = [

@@ -21,6 +21,7 @@ let pathSrc = path.resolve(__dirname, "src");
 export default defineConfig({
   build: {
     outDir: "../flaskSystem/static",
+    minify: "terser",
     terserOptions: {
       compress: {
         drop_console: true,
@@ -28,16 +29,16 @@ export default defineConfig({
       },
     },
     rollupOptions: {
-      // output: { //静态资源分类打包
-      //     chunkFileNames: 'static/js/[name]-[hash].js',
-      //     entryFileNames: 'static/js/[name]-[hash].js',
-      //     assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
-      //     manualChunks(id) { //静态资源分拆打包
-      //         if (id.includes('node_modules')) {
-      //             return id.toString().split('node_modules/')[1].split('/')[0].toString();
-      //         }
-      //     }
-      // }
+      output: { //静态资源分类打包
+        chunkFileNames: 'static/js/[name]-[hash].js',
+        entryFileNames: 'static/js/[name]-[hash].js',
+        assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
+        manualChunks(id) { //静态资源分拆打包
+          if (id.includes('node_modules')) {
+            return id.toString().split('node_modules/')[1].split('/')[0].toString();
+          }
+        }
+      }
     },
   } as BuildOptions,
   resolve: {
@@ -71,4 +72,15 @@ export default defineConfig({
       },
     },
   },
+  // server: { //主要是加上这段代码
+  //   // host: '127.0.0.1',
+  //   // port: 3000,
+  //   proxy: {
+  //     '/api': {
+  //       target: 'http://192.168.31.103:8899',	//实际请求地址
+  //       changeOrigin: true,
+  //       rewrite: (path) => path.replace(/^\/api/, '')
+  //     },
+  //   }
+  // }
 });

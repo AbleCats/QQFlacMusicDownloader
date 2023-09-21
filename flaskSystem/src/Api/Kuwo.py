@@ -14,16 +14,16 @@ from flaskSystem.src.Common.Http import HttpRequest
 from flaskSystem.src.Common.Tools import subString
 from flaskSystem.src.Types.Types import Songs
 
-
 class KwApi(BaseApi):
     __csrf = ''
 
     httpClient: HttpRequest = None
+    
 
     def __init__(self):
         self.httpClient = Http.HttpRequest()
         self.generateCSRFToken()
-        self.__KuwoDES = KuwoDES()
+        self.__KuwoDES = KuwoDES()        
 
     def search(self, searchKey: str) -> list[Songs]:
         pass
@@ -109,6 +109,76 @@ class KwApi(BaseApi):
                 'size': res['TOTAL'],
                 'next': page_num + 1,
                 'cur': res['PN'],
+                'searchKey': searchKey
+            }
+        }
+    
+    def getInitializationToken(self):
+        u = 'http://m.kuwo.cn/newh5app/api/mobile/v1/search/all?httpsStatus=1&key=hello'
+        res = self.getUrl(u)
+        cookie = self.httpClient.getSession().cookies.get_dict()
+        return cookie.get("BAIDU_RANDOM")
+    
+    def search_kw_h5(self, searchKey: str, page_num: int = 1, page_size=100,rid='',encId=''):
+        """
+        酷我h5端搜索接口
+
+        Args:
+            searchKey (str): 关键词
+            page_num (int, optional): 页码. Defaults to 1.
+            page_size (int, optional): 每页搜索数量. Defaults to 100.
+            rid (str, optional): 百度随机ID,用于加密计算. Defaults to ''.
+            encId (str, optional): 加密后的百度随机ID 加密算法逆向自酷我h5端. Defaults to ''.
+
+        Returns:
+            _type_: _description_
+        """
+        url = "http://m.kuwo.cn/newh5app/api/mobile/v1/search/all"
+
+        querystring = {"httpsStatus":"1","key":searchKey,'pn':page_num}
+
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "Connection": "keep-alive",
+            "Referer": ("http://m.kuwo.cn/newh5app/search?key="+searchKey).encode(),
+            "Token": encId,
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1 Edg/115.0.0.0",
+            "Cookie": "BAIDU_RANDOM="+rid
+        }
+        res = self.httpClient.getHttp(url, 0, b'', headers,params=querystring)
+        res = res.json()
+        res = res['data']['music']
+        lst = []
+        for li in res:
+            extra = None
+            bitrate = ""
+            it = {
+                'prefix': bitrate,
+                'extra': extra,
+                'notice': "无音质",
+                'mid': li['id'],
+                'musicid': li['id'],
+                'songmid': li['id'],
+                'size': "无",
+                'title': li['name'],
+                'singer': li['artist_name'],
+                'album': li['album_name'].replace('&nbsp;',' '),
+                'time_publish': "无",
+                # 'hasLossless': li['hasLossless'],
+                'readableText': f"{li['artist_name']} - {li['name']}"
+            }
+            # 如果要优化加载速度可以不要这个
+            # time = self.getMusicInfo(it['mid'])
+            # t = time['data']['releaseDate']
+            # it['time_publish'] = t
+            lst.append(it)
+        return {
+            'data': lst,
+            'page': {
+                'size': 10000,
+                'next': page_num + 1,
+                'cur': page_num,
                 'searchKey': searchKey
             }
         }
@@ -200,7 +270,7 @@ class KwApi(BaseApi):
             直链地址
         """
         willEnc = f'corp=kuwo&p2p=1&type=convert_url2&format=flac|mp3|aac&rid={mid}'
-        url = f'''http://nmobi.kuwo.cn/mobi.s?f=kuwo&q={self.__KuwoDES.base64_encrypt(willEnc)}'''
+        url = f'''http://mobi.kuwo.cn/mobi.s?f=kuwo&q={self.__KuwoDES.base64_encrypt(willEnc)}'''
         res = self.getUrl(url)
         link = subString(res.text, "url=", "\r\n")
         return link
